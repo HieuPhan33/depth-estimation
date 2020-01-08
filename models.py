@@ -550,21 +550,22 @@ class ResNetSkipAdd(nn.Module):
             self.decode_conv1 = upsample(512, 256)
             self.decode_conv2 = upsample(256, 128)
             self.decode_conv3 = upsample(128, 64)
-            self.decode_conv4 = upsample(64, 32)
+            self.decode_conv5 = upsample(64, 32)
             #self.decode_conv5 = upsample(64, 32)
+        self.decode_conv4 = pointwise(64,64)
         # self.decode_conv1 = conv(1024, 512, kernel_size)
         # self.decode_conv2 = conv(512, 256, kernel_size)
         # self.decode_conv3 = conv(256, 128, kernel_size)
         # self.decode_conv4 = conv(128, 64, kernel_size)
         # self.decode_conv5 = conv(64, 32, kernel_size)
         self.unpool = nn.MaxUnpool2d(kernel_size=2, stride=2)
-        self.decode_conv5 = pointwise(32, 1)
+        self.decode_conv6 = pointwise(32, 1)
         weights_init(self.decode_conv1)
         weights_init(self.decode_conv2)
         weights_init(self.decode_conv3)
         weights_init(self.decode_conv4)
         weights_init(self.decode_conv5)
-        #weights_init(self.decode_conv6)
+        weights_init(self.decode_conv6)
 
     def forward(self, x):
         # resnet
@@ -588,10 +589,10 @@ class ResNetSkipAdd(nn.Module):
         # decoder
         y = self.decode_conv0(y) # 7 x 7 x 1024 -> 7 x 7 x 512
         y = y + x6
-        for i in range(1,5):
+        for i in range(1,6):
             layer = getattr(self, 'decode_conv{}'.format(i))
             y = layer(y)
-            if self.decoder in ['nnconv5dw', 'blconv5dw']:
+            if i != 4 and self.decoder in ['nnconv5dw','blconv5dw']:
                 # Upsample
                 y = F.interpolate(y, scale_factor=2, mode='nearest')
             # Skip-connection
@@ -602,8 +603,10 @@ class ResNetSkipAdd(nn.Module):
             elif i == 3:
                 y = y + x2
                 y = self.unpool(y,indices) # 56 x 56 x 64 -> 112 x 112 x 64
+            elif i == 4:
+                y = y + x1
 
-        y = self.decode_conv5(y)
+        y = self.decode_conv6(y)
         return y
         # y10 = self.decode_conv1(x7)
         # # print("y10", y10.size())
