@@ -5,10 +5,10 @@ import torch.utils.data as data
 import h5py
 import dataloaders.transforms as transforms
 
-def h5_loader(path):
+def h5_loader(path, tranpose=False):
     h5f = h5py.File(path, "r")
     rgb = np.array(h5f['rgb'])
-    rgb = np.transpose(rgb, (1, 2, 0))
+    #rgb = np.transpose(rgb, (1, 2, 0))
     depth = np.array(h5f['depth'])
     return rgb, depth
 
@@ -40,6 +40,7 @@ class MyDataloader(data.Dataset):
                     if self.is_image_file(fname):
                         path = os.path.join(root, fname)
                         item = (path, class_to_idx[target])
+                        # Path_to_class, index of class
                         images.append(item)
         return images
 
@@ -72,7 +73,7 @@ class MyDataloader(data.Dataset):
     def train_transform(self, rgb, depth):
         raise (RuntimeError("train_transform() is not implemented. "))
 
-    def val_transform(rgb, depth):
+    def val_transform(self, rgb, depth):
         raise (RuntimeError("val_transform() is not implemented."))
 
     def __getraw__(self, index):
@@ -89,6 +90,9 @@ class MyDataloader(data.Dataset):
 
     def __getitem__(self, index):
         rgb, depth = self.__getraw__(index)
+        if rgb.ndim < 2 and depth.ndim != 2:
+            print("Wrong DEPTH ",depth)
+            return None
         if self.transform is not None:
             rgb_np, depth_np = self.transform(rgb, depth)
         else:

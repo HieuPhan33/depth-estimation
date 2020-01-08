@@ -59,7 +59,7 @@ def conv(in_channels, out_channels, kernel_size):
         )
 
 def depthwise(in_channels, kernel_size):
-    padding = (kernel_size-1) // 2
+    padding = (kernel_size-1) // 2 # Maintain resolution
     assert 2*padding == kernel_size-1, "parameters incorrect. kernel={}, padding={}".format(kernel_size, padding)
     return nn.Sequential(
           nn.Conv2d(in_channels,in_channels,kernel_size,stride=1,padding=padding,bias=False,groups=in_channels),
@@ -69,7 +69,7 @@ def depthwise(in_channels, kernel_size):
 
 def pointwise(in_channels, out_channels):
     return nn.Sequential(
-          nn.Conv2d(in_channels,out_channels,1,1,0,bias=False),
+          nn.Conv2d(in_channels,out_channels,kernel_size=1,stride=1,padding=0,bias=False),
           nn.BatchNorm2d(out_channels),
           nn.ReLU(inplace=True),
         )
@@ -78,8 +78,8 @@ def convt(in_channels, out_channels, kernel_size):
     stride = 2
     padding = (kernel_size - 1) // 2
     output_padding = kernel_size % 2
-    assert -2 - 2*padding + kernel_size + output_padding == 0, "deconv parameters incorrect"
-    return nn.Sequential(
+    assert -2 - 2*padding + kernel_size + output_padding == 0, "deconv parameters incorrect" # k must be odd
+    return nn.Sequential( # Double the resolution
             nn.ConvTranspose2d(in_channels,out_channels,kernel_size,
                 stride,padding,output_padding,bias=False),
             nn.BatchNorm2d(out_channels),
@@ -98,10 +98,11 @@ def convt_dw(channels, kernel_size):
             nn.ReLU(inplace=True),
         )
 
-def upconv(in_channels, out_channels):
+def upconv(in_channels, out_channels,kernel_size=5):
+    # Unpool then conv maintaining resolution
     return nn.Sequential(
         Unpool(2),
-        nn.Conv2d(in_channels,out_channels,kernel_size=5,stride=1,padding=2,bias=False),
+        nn.Conv2d(in_channels,out_channels,kernel_size=kernel_size,stride=1,padding=2,bias=False),
         nn.BatchNorm2d(out_channels),
         nn.ReLU(),
     )
@@ -132,6 +133,18 @@ class upproj(nn.Module):
         x2 = self.branch2(x)
         return F.relu(x1 + x2)
 
+class shuffle_conv(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(shuffle_conv,self).__init__()
+        self.conv = nn.Sequential(
+                depthwise(in_channels, 5),
+                pointwise(in_channels, out_channels)
+        )
+
+    def forward(self,x):
+        x = F.pixel_shuffle(x,upscale_factor=2)
+        return self.conv(x)
+
 class Decoder(nn.Module):
     names = ['deconv{}{}'.format(i,dw) for i in range(3,10,2) for dw in ['', 'dw']]
     names.append("upconv")
@@ -143,7 +156,6 @@ class Decoder(nn.Module):
             names.append("shuffle{}{}".format(i, dw))
 
 class DeConv(nn.Module):
-
     def __init__(self, kernel_size, dw):
         super(DeConv, self).__init__()
         if dw:
@@ -180,7 +192,7 @@ class DeConv(nn.Module):
         return x
 
 
-class UpConv(nn.Module):
+class UpConv(nn.Module): # Unpool then conv
 
     def __init__(self):
         super(UpConv, self).__init__()
@@ -221,7 +233,7 @@ class UpProj(nn.Module):
         x = self.convf(x)
         return x
 
-class NNConv(nn.Module):
+class NNConv(nn.Module): # Conv then upsampling + interpolation
 
     def __init__(self, kernel_size, dw):
         super(NNConv, self).__init__()
@@ -293,7 +305,8 @@ class BLConv(NNConv):
         x = self.conv6(x)
         return x
 
-class ShuffleConv(nn.Module):
+
+class ShuffleConv(nn.Module): # Conv then upsampling by pixel_shuffling
 
     def __init__(self, kernel_size, dw):
         super(ShuffleConv, self).__init__()
@@ -332,8 +345,13 @@ class ShuffleConv(nn.Module):
         x = F.pixel_shuffle(x, 2)
         return x
 
+def deconv(in_channels,out_channels,kernel_size=5):
+    return nn.Sequential(
+        convt_dw(in_channels, kernel_size),
+        pointwise(in_channels, out_channels))
+
 def choose_decoder(decoder):
-    depthwise = ('dw' in decoder)
+    depthwise = ('dw' in decoder) # deconv_dw
     if decoder[:6] == 'deconv':
         assert len(decoder)==7 or (len(decoder)==9 and 'dw' in decoder)
         kernel_size = int(decoder[6])
@@ -439,7 +457,7 @@ class MobileNet(nn.Module):
 
         if in_channels == 3:
             self.mobilenet = nn.Sequential(*(mobilenet.model[i] for i in range(14)))
-        else:
+        else: # Sampling the inp_channel to the out_channel matching the 2nd layer
             def conv_bn(inp, oup, stride):
                 return nn.Sequential(
                     nn.Conv2d(inp, oup, 3, stride, 1, bias=False),
@@ -460,8 +478,9 @@ class MobileNet(nn.Module):
         return x
 
 class ResNetSkipAdd(nn.Module):
-    def __init__(self, layers, output_size, in_channels=3, pretrained=True):
-
+    # Decoder: conv + upsampling by nearest interpolation
+    def __init__(self, layers, output_size, in_channels=3, pretrained=True, decoder='nnconv5dw'):
+        self.decoder = decoder
         if layers not in [18, 34, 50, 101, 152]:
             raise RuntimeError('Only 18, 34, 50, 101, and 152 layer model are defined for ResNet. Got {}'.format(layers))
         
@@ -481,7 +500,9 @@ class ResNetSkipAdd(nn.Module):
             weights_init(self.bn1)
         
         self.relu = pretrained_model._modules['relu']
-        self.maxpool = pretrained_model._modules['maxpool']
+        #self.maxpool = pretrained_model._modules['maxpool']
+        #self.maxpool.return_indices = True
+        self.maxpool = nn.MaxPool2d(kernel_size=2,stride=2,return_indices=True)
         self.layer1 = pretrained_model._modules['layer1']
         self.layer2 = pretrained_model._modules['layer2']
         self.layer3 = pretrained_model._modules['layer3']
@@ -497,20 +518,53 @@ class ResNetSkipAdd(nn.Module):
             num_channels = 2048
         self.conv2 = nn.Conv2d(num_channels, 1024, 1)
         weights_init(self.conv2)
-        
+
+        self.decode_conv0 = pointwise(1024,512)
+        weights_init(self.decode_conv0)
+
         kernel_size = 5
-        self.decode_conv1 = conv(1024, 512, kernel_size)
-        self.decode_conv2 = conv(512, 256, kernel_size)
-        self.decode_conv3 = conv(256, 128, kernel_size)
-        self.decode_conv4 = conv(128, 64, kernel_size)
-        self.decode_conv5 = conv(64, 32, kernel_size)
-        self.decode_conv6 = pointwise(32, 1)
+        upsample = None
+        if decoder == 'upproj':
+            upsample = upproj
+        elif decoder == 'upconv':
+            upsample = upconv
+        elif decoder == 'shuffle':
+            upsample = shuffle_conv
+        if decoder in ['nnconv5dw', 'blconv5dw']:
+            self.decode_conv1 = nn.Sequential(
+                depthwise(512, kernel_size),
+                pointwise(512, 256))
+            self.decode_conv2 = nn.Sequential(
+                depthwise(256, kernel_size),
+                pointwise(256, 128))
+            self.decode_conv3 = nn.Sequential(
+                depthwise(128, kernel_size),
+                pointwise(128, 64))
+            self.decode_conv4 = nn.Sequential(
+                depthwise(64, kernel_size),
+                pointwise(64, 32))
+            # self.decode_conv5 = nn.Sequential(
+            #     depthwise(64, kernel_size),
+            #     pointwise(64, 32))
+        else:
+            self.decode_conv1 = upsample(512, 256)
+            self.decode_conv2 = upsample(256, 128)
+            self.decode_conv3 = upsample(128, 64)
+            self.decode_conv4 = upsample(64, 32)
+            #self.decode_conv5 = upsample(64, 32)
+        # self.decode_conv1 = conv(1024, 512, kernel_size)
+        # self.decode_conv2 = conv(512, 256, kernel_size)
+        # self.decode_conv3 = conv(256, 128, kernel_size)
+        # self.decode_conv4 = conv(128, 64, kernel_size)
+        # self.decode_conv5 = conv(64, 32, kernel_size)
+        self.unpool = nn.MaxUnpool2d(kernel_size=2, stride=2)
+        self.decode_conv5 = pointwise(32, 1)
         weights_init(self.decode_conv1)
         weights_init(self.decode_conv2)
         weights_init(self.decode_conv3)
         weights_init(self.decode_conv4)
         weights_init(self.decode_conv5)
-        weights_init(self.decode_conv6)
+        #weights_init(self.decode_conv6)
 
     def forward(self, x):
         # resnet
@@ -518,7 +572,7 @@ class ResNetSkipAdd(nn.Module):
         x = self.bn1(x)
         x1 = self.relu(x)
         # print("x1", x1.size())
-        x2 = self.maxpool(x1)
+        x2, indices = self.maxpool(x1)
         # print("x2", x2.size())
         x3 = self.layer1(x2)
         # print("x3", x3.size())
@@ -528,41 +582,62 @@ class ResNetSkipAdd(nn.Module):
         # print("x5", x5.size())
         x6 = self.layer4(x5)
         # print("x6", x6.size())
-        x7 = self.conv2(x6)
+        #x7 = self.conv2(x6)
+        y = self.conv2(x6)
 
         # decoder
-        y10 = self.decode_conv1(x7)
-        # print("y10", y10.size())
-        y9 = F.interpolate(y10 + x6, scale_factor=2, mode='nearest')
-        # print("y9", y9.size())
-        y8 = self.decode_conv2(y9)
-        # print("y8", y8.size())
-        y7 = F.interpolate(y8 + x5, scale_factor=2, mode='nearest')
-        # print("y7", y7.size())
-        y6 = self.decode_conv3(y7)
-        # print("y6", y6.size())
-        y5 = F.interpolate(y6 + x4, scale_factor=2, mode='nearest')
-        # print("y5", y5.size())
-        y4 = self.decode_conv4(y5)
-        # print("y4", y4.size())
-        y3 = F.interpolate(y4 + x3, scale_factor=2, mode='nearest')
-        # print("y3", y3.size())
-        y2 = self.decode_conv5(y3 + x1)
-        # print("y2", y2.size())
-        y1 = F.interpolate(y2, scale_factor=2, mode='nearest')
-        # print("y1", y1.size())
-        y = self.decode_conv6(y1)
+        y = self.decode_conv0(y) # 7 x 7 x 1024 -> 7 x 7 x 512
+        y = y + x6
+        for i in range(1,5):
+            layer = getattr(self, 'decode_conv{}'.format(i))
+            y = layer(y)
+            if self.decoder in ['nnconv5dw', 'blconv5dw']:
+                # Upsample
+                y = F.interpolate(y, scale_factor=2, mode='nearest')
+            # Skip-connection
+            if i == 1:
+                y = y + x5
+            elif i == 2:
+                y = y + x4
+            elif i == 3:
+                y = y + x2
+                y = self.unpool(y,indices) # 56 x 56 x 64 -> 112 x 112 x 64
 
+        y = self.decode_conv5(y)
         return y
+        # y10 = self.decode_conv1(x7)
+        # # print("y10", y10.size())
+        # y9 = F.interpolate(y10 + x6, scale_factor=2, mode='nearest')
+        # # print("y9", y9.size())
+        # y8 = self.decode_conv2(y9)
+        # # print("y8", y8.size())
+        # y7 = F.interpolate(y8 + x5, scale_factor=2, mode='nearest')
+        # # print("y7", y7.size())
+        # y6 = self.decode_conv3(y7)
+        # # print("y6", y6.size())
+        # y5 = F.interpolate(y6 + x4, scale_factor=2, mode='nearest')
+        # # print("y5", y5.size())
+        # y4 = self.decode_conv4(y5)
+        # # print("y4", y4.size())
+        # #y3 = F.interpolate(y4 + x3, scale_factor=2, mode='nearest')
+        # y3 = self.unpool(y4,indices)
+        # # print("y3", y3.size())
+        # y2 = self.decode_conv5(y3 + x1)
+        # # print("y2", y2.size())
+        # y1 = F.interpolate(y2, scale_factor=2, mode='nearest')
+        # #y1 = self.unpool(y2,indices)
+        # # print("y1", y1.size())
+        # y = self.decode_conv6(y1)
+        #
+        # return y
 
 class ResNetSkipConcat(nn.Module):
-    def __init__(self, layers, output_size, in_channels=3, pretrained=True):
-
+    def __init__(self, layers, output_size, decoder='nnconv5dw', in_channels=3, pretrained=True):
         if layers not in [18, 34, 50, 101, 152]:
             raise RuntimeError('Only 18, 34, 50, 101, and 152 layer model are defined for ResNet. Got {}'.format(layers))
-        
         super(ResNetSkipConcat, self).__init__()
         self.output_size = output_size
+        self.decoder = decoder
         pretrained_model = torchvision.models.__dict__['resnet{}'.format(layers)](pretrained=pretrained)
         if not pretrained:
             pretrained_model.apply(weights_init)
@@ -577,7 +652,8 @@ class ResNetSkipConcat(nn.Module):
             weights_init(self.bn1)
         
         self.relu = pretrained_model._modules['relu']
-        self.maxpool = pretrained_model._modules['maxpool']
+        #self.maxpool = pretrained_model._modules['maxpool']
+        self.maxpool = nn.MaxPool2d(kernel_size=2,stride=2,return_indices=True)
         self.layer1 = pretrained_model._modules['layer1']
         self.layer2 = pretrained_model._modules['layer2']
         self.layer3 = pretrained_model._modules['layer3']
@@ -595,11 +671,41 @@ class ResNetSkipConcat(nn.Module):
         weights_init(self.conv2)
         
         kernel_size = 5
-        self.decode_conv1 = conv(1024, 512, kernel_size)
-        self.decode_conv2 = conv(768, 256, kernel_size)
-        self.decode_conv3 = conv(384, 128, kernel_size)
-        self.decode_conv4 = conv(192, 64, kernel_size)
-        self.decode_conv5 = conv(128, 32, kernel_size)
+        upsample = None
+        if decoder == 'upproj':
+            upsample = upproj
+        elif decoder == 'upconv':
+            upsample = upconv
+        elif decoder == 'shuffle':
+            upsample = shuffle_conv
+        if decoder in ['nnconv5dw', 'blconv5dw']:
+            self.decode_conv1 = nn.Sequential(
+                depthwise(1024, kernel_size),
+                pointwise(1024, 512))
+            self.decode_conv2 = nn.Sequential(
+                depthwise(768, kernel_size),
+                pointwise(768, 256))
+            self.decode_conv3 = nn.Sequential(
+                depthwise(384, kernel_size),
+                pointwise(384, 128))
+            self.decode_conv4 = nn.Sequential(
+                depthwise(192, kernel_size),
+                pointwise(192, 64))
+            self.decode_conv5 = nn.Sequential(
+                depthwise(128, kernel_size),
+                pointwise(128, 32))
+        else:
+            self.decode_conv1 = upsample(1024, 512)
+            self.decode_conv2 = upsample(768, 256)
+            self.decode_conv3 = upsample(384, 128)
+            self.decode_conv4 = upsample(192, 64)
+            self.decode_conv5 = upsample(128, 32)
+        # self.decode_conv1 = conv(1024, 512, kernel_size)
+        # self.decode_conv2 = conv(768, 256, kernel_size)
+        # self.decode_conv3 = conv(384, 128, kernel_size)
+        # self.decode_conv4 = conv(192, 64, kernel_size)
+        # self.decode_conv5 = conv(128, 32, kernel_size)
+        self.unpool = nn.MaxUnpool2d(kernel_size=2, stride=2)
         self.decode_conv6 = pointwise(32, 1)
         weights_init(self.decode_conv1)
         weights_init(self.decode_conv2)
@@ -614,7 +720,7 @@ class ResNetSkipConcat(nn.Module):
         x = self.bn1(x)
         x1 = self.relu(x)
         # print("x1", x1.size())
-        x2 = self.maxpool(x1)
+        x2, indices = self.maxpool(x1)
         # print("x2", x2.size())
         x3 = self.layer1(x2)
         # print("x3", x3.size())
@@ -624,38 +730,58 @@ class ResNetSkipConcat(nn.Module):
         # print("x5", x5.size())
         x6 = self.layer4(x5)
         # print("x6", x6.size())
-        x7 = self.conv2(x6)
+        y = self.conv2(x6)
 
         # decoder
-        y10 = self.decode_conv1(x7)
-        # print("y10", y10.size())
-        y9 = F.interpolate(y10, scale_factor=2, mode='nearest')
-        # print("y9", y9.size())
-        y8 = self.decode_conv2(torch.cat((y9, x5), 1))
-        # print("y8", y8.size())
-        y7 = F.interpolate(y8, scale_factor=2, mode='nearest')
-        # print("y7", y7.size())
-        y6 = self.decode_conv3(torch.cat((y7, x4), 1))
-        # print("y6", y6.size())
-        y5 = F.interpolate(y6, scale_factor=2, mode='nearest')
-        # print("y5", y5.size())
-        y4 = self.decode_conv4(torch.cat((y5, x3), 1))
-        # print("y4", y4.size())
-        y3 = F.interpolate(y4, scale_factor=2, mode='nearest')
-        # print("y3", y3.size())
-        y2 = self.decode_conv5(torch.cat((y3, x1), 1))
-        # print("y2", y2.size())
-        y1 = F.interpolate(y2, scale_factor=2, mode='nearest')
-        # print("y1", y1.size())
-        y = self.decode_conv6(y1)
-
+        for i in range(1,6):
+            layer = getattr(self, 'decode_conv{}'.format(i))
+            y = layer(y)
+            if self.decoder in ['nnconv5dw','blconv5dw']:
+                if i == 4:
+                    y = self.unpool(y,indices)
+                else:
+                    y = F.interpolate(y, scale_factor=2, mode='nearest')
+            if i == 1:
+                y = torch.cat((y,x5),1)
+            elif i == 2:
+                y = torch.cat((y,x4),1)
+            elif i == 3:
+                y = torch.cat((y,x3),1)
+            elif i == 4:
+                y = torch.cat((y,x1),1)
+        y = self.decode_conv6(y)
         return y
+        # y10 = self.decode_conv1(x7)
+        # # print("y10", y10.size())
+        # y9 = F.interpolate(y10, scale_factor=2, mode='nearest')
+        # # print("y9", y9.size())
+        # y8 = self.decode_conv2(torch.cat((y9, x5), 1))
+        # # print("y8", y8.size())
+        # y7 = F.interpolate(y8, scale_factor=2, mode='nearest')
+        # # print("y7", y7.size())
+        # y6 = self.decode_conv3(torch.cat((y7, x4), 1))
+        # # print("y6", y6.size())
+        # y5 = F.interpolate(y6, scale_factor=2, mode='nearest')
+        # # print("y5", y5.size())
+        # y4 = self.decode_conv4(torch.cat((y5, x3), 1))
+        # # print("y4", y4.size())
+        # #y3 = F.interpolate(y4, scale_factor=2, mode='nearest')
+        # y3 = self.unpool(y4,indices)
+        # # print("y3", y3.size())
+        # y2 = self.decode_conv5(torch.cat((y3, x1), 1))
+        # # print("y2", y2.size())
+        # y1 = F.interpolate(y2, scale_factor=2, mode='nearest')
+        # # print("y1", y1.size())
+        # y = self.decode_conv6(y1)
+
+        #return y
 
 class MobileNetSkipAdd(nn.Module):
-    def __init__(self, output_size, pretrained=True):
-
+    def __init__(self, output_size, decoder='nnconv5dw', pretrained=True):
         super(MobileNetSkipAdd, self).__init__()
+        assert (decoder in ['nnconv5dw', 'blconv5dw', 'upproj', 'shuffle', 'upconv','deconv'])
         self.output_size = output_size
+        self.decoder = decoder
         mobilenet = imagenet.mobilenet.MobileNet()
         if pretrained:
             pretrained_path = os.path.join('imagenet', 'results', 'imagenet.arch=mobilenet.lr=0.1.bs=256', 'model_best.pth.tar')
@@ -680,21 +806,37 @@ class MobileNetSkipAdd(nn.Module):
         # self.decode_conv3 = conv(256, 128, kernel_size)
         # self.decode_conv4 = conv(128, 64, kernel_size)
         # self.decode_conv5 = conv(64, 32, kernel_size)
-        self.decode_conv1 = nn.Sequential(
-            depthwise(1024, kernel_size),
-            pointwise(1024, 512))
-        self.decode_conv2 = nn.Sequential(
-            depthwise(512, kernel_size),
-            pointwise(512, 256))
-        self.decode_conv3 = nn.Sequential(
-            depthwise(256, kernel_size),
-            pointwise(256, 128))
-        self.decode_conv4 = nn.Sequential(
-            depthwise(128, kernel_size),
-            pointwise(128, 64))
-        self.decode_conv5 = nn.Sequential(
-            depthwise(64, kernel_size),
-            pointwise(64, 32))
+        upsample = None
+        if decoder == 'upproj':
+            upsample = upproj
+        elif decoder == 'upconv':
+            upsample = upconv
+        elif decoder == 'shuffle':
+            upsample = shuffle_conv
+        elif decoder == 'deconv':
+            upsample = deconv
+        if decoder in ['nnconv5dw', 'blconv5dw']:
+            self.decode_conv1 = nn.Sequential(
+                depthwise(1024, kernel_size),
+                pointwise(1024, 512))
+            self.decode_conv2 = nn.Sequential(
+                depthwise(512, kernel_size),
+                pointwise(512, 256))
+            self.decode_conv3 = nn.Sequential(
+                depthwise(256, kernel_size),
+                pointwise(256, 128))
+            self.decode_conv4 = nn.Sequential(
+                depthwise(128, kernel_size),
+                pointwise(128, 64))
+            self.decode_conv5 = nn.Sequential(
+                depthwise(64, kernel_size),
+                pointwise(64, 32))
+        else:
+            self.decode_conv1 = upsample(1024,512)
+            self.decode_conv2 = upsample(512,256)
+            self.decode_conv3 = upsample(256,128)
+            self.decode_conv4 = upsample(128,64)
+            self.decode_conv5 = upsample(64,32)
         self.decode_conv6 = pointwise(32, 1)
         weights_init(self.decode_conv1)
         weights_init(self.decode_conv2)
@@ -721,6 +863,10 @@ class MobileNetSkipAdd(nn.Module):
             layer = getattr(self, 'decode_conv{}'.format(i))
             x = layer(x)
             x = F.interpolate(x, scale_factor=2, mode='nearest')
+            # if self.decoder == 'nnconv5dw':
+            #     x = F.interpolate(x, scale_factor=2, mode='nearest')
+            # elif self.decoder == 'blconv5dw':
+            #     x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False)
             if i==4:
                 x = x + x1
             elif i==3:
@@ -732,10 +878,11 @@ class MobileNetSkipAdd(nn.Module):
         return x
 
 class MobileNetSkipConcat(nn.Module):
-    def __init__(self, output_size, pretrained=True):
-
+    def __init__(self, output_size, decoder='nnconv5dw', pretrained=True):
         super(MobileNetSkipConcat, self).__init__()
+        assert (decoder in ['nnconv5dw','blconv5dw','upproj','shuffle','upconv','deconv'])
         self.output_size = output_size
+        self.decoder = decoder
         mobilenet = imagenet.mobilenet.MobileNet()
         if pretrained:
             pretrained_path = os.path.join('imagenet', 'results', 'imagenet.arch=mobilenet.lr=0.1.bs=256', 'model_best.pth.tar')
@@ -755,26 +902,42 @@ class MobileNetSkipConcat(nn.Module):
             setattr( self, 'conv{}'.format(i), mobilenet.model[i])
 
         kernel_size = 5
-        # self.decode_conv1 = conv(1024, 512, kernel_size)
+        #self.decode_conv1 = conv(1024, 512, kernel_size)
         # self.decode_conv2 = conv(512, 256, kernel_size)
         # self.decode_conv3 = conv(256, 128, kernel_size)
         # self.decode_conv4 = conv(128, 64, kernel_size)
         # self.decode_conv5 = conv(64, 32, kernel_size)
-        self.decode_conv1 = nn.Sequential(
-            depthwise(1024, kernel_size),
-            pointwise(1024, 512))
-        self.decode_conv2 = nn.Sequential(
-            depthwise(512, kernel_size),
-            pointwise(512, 256))
-        self.decode_conv3 = nn.Sequential(
-            depthwise(512, kernel_size),
-            pointwise(512, 128))
-        self.decode_conv4 = nn.Sequential(
-            depthwise(256, kernel_size),
-            pointwise(256, 64))
-        self.decode_conv5 = nn.Sequential(
-            depthwise(128, kernel_size),
-            pointwise(128, 32))
+        upsample = None
+        if decoder == 'upproj':
+            upsample = upproj
+        elif decoder == 'upconv':
+            upsample = upconv
+        elif decoder == 'shuffle':
+            upsample = shuffle_conv
+        elif decoder == 'deconv':
+            upsample = deconv
+        if decoder in ['nnconv5dw','blconv5dw']:
+            self.decode_conv1 = nn.Sequential(
+                depthwise(1024, kernel_size),
+                pointwise(1024, 512))
+            self.decode_conv2 = nn.Sequential(
+                depthwise(512, kernel_size),
+                pointwise(512, 256))
+            self.decode_conv3 = nn.Sequential(
+                depthwise(512, kernel_size),
+                pointwise(512, 128))
+            self.decode_conv4 = nn.Sequential(
+                depthwise(256, kernel_size),
+                pointwise(256, 64))
+            self.decode_conv5 = nn.Sequential( # Reduce channels
+                depthwise(128, kernel_size),
+                pointwise(128, 32))
+        else:
+            self.decode_conv1 = upsample(1024,512)
+            self.decode_conv2 = upsample(512,256)
+            self.decode_conv3 = upsample(512,128) # Concat => inp = 256*2
+            self.decode_conv4 = upsample(256,64) # inp = 128*2
+            self.decode_conv5 = upsample(128,32) # inp = 64*2
         self.decode_conv6 = pointwise(32, 1)
         weights_init(self.decode_conv1)
         weights_init(self.decode_conv2)
@@ -797,12 +960,17 @@ class MobileNetSkipConcat(nn.Module):
                 x2 = x
             elif i==5:
                 x3 = x
+
+        # Decoding
         for i in range(1,6):
             layer = getattr(self, 'decode_conv{}'.format(i))
             # print("{}a: {}".format(i, x.size()))
             x = layer(x)
             # print("{}b: {}".format(i, x.size()))
-            x = F.interpolate(x, scale_factor=2, mode='nearest')
+            if self.decoder == 'nnconv5dw':
+                x = F.interpolate(x, scale_factor=2, mode='nearest')
+            elif self.decoder == 'blconv5dw':
+                x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False)
             if i==4:
                 x = torch.cat((x, x1), 1)
             elif i==3:

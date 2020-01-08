@@ -20,7 +20,7 @@ class NYUDataset(MyDataloader):
         elif self.split == 'val':
             return (filename.endswith('.h5'))
         else:
-            raise (RuntimeError("Invalid dataset split: " + split + "\n"
+            raise (RuntimeError("Invalid dataset split: " + self.split + "\n"
                                 "Supported dataset splits are: train, val"))
 
     def train_transform(self, rgb, depth):
@@ -28,6 +28,7 @@ class NYUDataset(MyDataloader):
         depth_np = depth / s
         angle = np.random.uniform(-5.0, 5.0) # random rotation degrees
         do_flip = np.random.uniform(0.0, 1.0) < 0.5 # random horizontal flip
+        iheight = rgb.shape[0]
 
         # perform 1st step of data augmentation
         transform = transforms.Compose([
@@ -41,13 +42,17 @@ class NYUDataset(MyDataloader):
         rgb_np = transform(rgb)
         rgb_np = self.color_jitter(rgb_np) # random color jittering
         rgb_np = np.asfarray(rgb_np, dtype='float') / 255
+        if depth_np.ndim != 2:
+            print("Wrong Depth ",depth_np)
         depth_np = transform(depth_np)
 
         return rgb_np, depth_np
 
     def val_transform(self, rgb, depth):
+        iheight = rgb.shape[0]
         depth_np = depth
         transform = transforms.Compose([
+            #transforms.Resize((iheight,iwidth)),
             transforms.Resize(250.0 / iheight),
             transforms.CenterCrop((228, 304)),
             transforms.Resize(self.output_size),

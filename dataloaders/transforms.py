@@ -4,6 +4,7 @@ import math
 import random
 
 from PIL import Image, ImageOps, ImageEnhance
+from skimage.transform import resize
 try:
     import accimage
 except ImportError:
@@ -14,6 +15,7 @@ import numbers
 import types
 import collections
 import warnings
+
 
 import scipy.ndimage.interpolation as itpl
 import scipy.misc as misc
@@ -333,12 +335,28 @@ class Resize(object):
         Returns:
             PIL Image: Rescaled image.
         """
-        if img.ndim == 3:
-            return misc.imresize(img, self.size, self.interpolation)
-        elif img.ndim == 2:
-            return misc.imresize(img, self.size, self.interpolation, 'F')
+        im = Image.fromarray(img)
+        ts = type(self.size)
+        if np.issubdtype(ts, np.signedinteger):
+            percent = self.size / 100.0
+            size = tuple((np.array(im.size) * percent).astype(int))
+        elif np.issubdtype(ts, np.floating):
+            size = tuple((np.array(im.size) * self.size).astype(int))
         else:
-            RuntimeError('img should be ndarray with 2 or 3 dimensions. Got {}'.format(img.ndim))
+            size = (self.size[1], self.size[0])
+        func = {'nearest': 0, 'lanczos': 1, 'bilinear': 2, 'bicubic': 3, 'cubic': 3}
+
+        return np.array(im.resize(size, resample=func[self.interpolation]))
+        # if img.ndim == 3:
+        #     return np.array(im.resize(size,resample=func[self.interpolation]))
+        #     #return resize(img, size, order=3)
+        #     #return misc.imresize(img, self.size, self.interpolation)
+        # elif img.ndim == 2:
+        #     return np.array(im.resize(size, resample=func[self.interpolation]))
+        #     #return resize(img, size, order=3)
+        #     #return misc.imresize(img, self.size, self.interpolation, 'F')
+        # else:
+        #     RuntimeError('img should be ndarray with 2 or 3 dimensions. Got {}'.format(img.ndim))
 
 
 class CenterCrop(object):

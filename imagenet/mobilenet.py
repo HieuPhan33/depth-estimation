@@ -1,7 +1,6 @@
 import os
 import shutil
 import time
-
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -38,12 +37,12 @@ class MobileNet(nn.Module):
             )
 
         self.model = nn.Sequential(
-            conv_bn(  3,  32, 2, relu6), 
-            conv_dw( 32,  64, 1, relu6),
-            conv_dw( 64, 128, 2, relu6),
-            conv_dw(128, 128, 1, relu6),
+            conv_bn(3, 32, 2, relu6),
+            conv_dw(32, 64, 1, relu6), #1
+            conv_dw(64, 128, 2, relu6),
+            conv_dw(128, 128, 1, relu6),# 3
             conv_dw(128, 256, 2, relu6),
-            conv_dw(256, 256, 1, relu6),
+            conv_dw(256, 256, 1, relu6), # 5
             conv_dw(256, 512, 2, relu6),
             conv_dw(512, 512, 1, relu6),
             conv_dw(512, 512, 1, relu6),
