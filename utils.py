@@ -14,7 +14,7 @@ def parse_command():
     loss_names = ['l1', 'l2']
     model_names = ['mobilenet-skipconcat','mobilenet-skipadd','resnet18-skipadd',
                    'resnet18-skipconcat','resnet50-skipadd','resnet50-skipconcat']
-    decoder_names = ['nnconv5dw','blconv5dw','upproj','shuffle','upconv','deconv']
+    decoder_names = ['nnconv5dw','blconv5dw','upproj','shuffle','upconv','deconv','aspd']
 
     from dataloaders.dataloader import MyDataloader
     modality_names = MyDataloader.modality_names

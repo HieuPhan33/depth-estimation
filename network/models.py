@@ -203,11 +203,6 @@ class ShuffleConv(nn.Module): # Conv then upsampling by pixel_shuffling
         x = F.pixel_shuffle(x, 2)
         return x
 
-def deconv(in_channels,out_channels,kernel_size=5):
-    return nn.Sequential(
-        convt_dw(in_channels, kernel_size),
-        pointwise(in_channels, out_channels))
-
 def choose_decoder(decoder):
     depthwise = ('dw' in decoder) # deconv_dw
     if decoder[:6] == 'deconv':
@@ -388,6 +383,8 @@ class ResNetSkipAdd(nn.Module):
             upsample = upconv
         elif decoder == 'shuffle':
             upsample = shuffle_conv
+        elif decoder == 'aspd':
+            upsample = ASPD
         if decoder in ['nnconv5dw', 'blconv5dw']:
             self.decode_conv1 = nn.Sequential(
                 depthwise(512, kernel_size),
@@ -408,7 +405,7 @@ class ResNetSkipAdd(nn.Module):
             self.decode_conv1 = upsample(512, 256)
             self.decode_conv2 = upsample(256, 128)
             self.decode_conv3 = upsample(128, 64)
-            self.decode_conv5 = upsample(64, 32)
+            #self.decode_conv5 = upsample(64, 32)
             #self.decode_conv5 = upsample(64, 32)
         self.decode_conv4 = pointwise(64,64)
         # self.decode_conv1 = conv(1024, 512, kernel_size)
@@ -422,7 +419,7 @@ class ResNetSkipAdd(nn.Module):
         weights_init(self.decode_conv2)
         weights_init(self.decode_conv3)
         weights_init(self.decode_conv4)
-        weights_init(self.decode_conv5)
+        #weights_init(self.decode_conv5)
         weights_init(self.decode_conv6)
 
     def forward(self, x):
@@ -539,6 +536,8 @@ class ResNetSkipConcat(nn.Module):
             upsample = upconv
         elif decoder == 'shuffle':
             upsample = shuffle_conv
+        elif decoder == 'aspd':
+            upsample = ASPD
         if decoder in ['nnconv5dw', 'blconv5dw']:
             self.decode_conv1 = nn.Sequential(
                 depthwise(1024, kernel_size),
@@ -777,6 +776,8 @@ class MobileNetSkipConcat(nn.Module):
             upsample = shuffle_conv
         elif decoder == 'deconv':
             upsample = deconv
+        elif decoder == 'aspd':
+            upsample = ASPD
         if decoder in ['nnconv5dw','blconv5dw']:
             self.decode_conv1 = nn.Sequential(
                 depthwise(1024, kernel_size),
