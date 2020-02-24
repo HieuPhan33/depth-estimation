@@ -6,7 +6,7 @@ import criteria
 import matplotlib.pyplot as plt
 from torchvision import transforms
 import torch.utils.data.dataloader
-import nonechucks as nc
+#import nonechucks as nc
 
 import torch
 import torch.nn.parallel
@@ -17,11 +17,16 @@ cudnn.benchmark = True
 import models
 from metrics import AverageMeter, Result
 import utils
-from torch.utils.data._utils.collate import default_collate
+#from torch.utils.data._utils.collate import default_collate
 
-def filter_none_collate(batch):
-    batch = [x for x in batch if x]
-    return default_collate(batch)
+def my_collate(batch):
+    len_batch = len(batch) # original batch length
+    batch = list(filter (lambda x:x is not None, batch)) # filter out all the Nones
+    if len_batch > len(batch): # if there are samples missing just use existing members, doesn't work if you reject every sample in a batch
+        diff = len_batch - len(batch)
+        for i in range(diff):
+            batch = batch + batch[:diff]
+    return torch.utils.data.dataloader.default_collate(batch)
 
 args = utils.parse_command()
 print(args)
@@ -42,8 +47,9 @@ def main():
 
     # Data loading code
     print("=> creating data loaders...")
-    valdir = os.path.join('..', 'data', args.data, 'val')
-    traindir = os.path.join('..', 'data', args.data, 'train')
+    data_dir = '/media/vasp/Data2/Users/vmhp806/depth-estimation'
+    valdir = os.path.join(data_dir, 'data', args.data, 'val')
+    traindir = os.path.join(data_dir, 'data', args.data, 'train')
 
     if args.data == 'nyudepthv2' or args.data == 'uow_dataset':
         from dataloaders.nyu import NYUDataset
@@ -57,12 +63,12 @@ def main():
     # set batch size to be 1 for validation
     val_loader = torch.utils.data.DataLoader(
         val_dataset,batch_size=1, shuffle=False, num_workers=args.workers, pin_memory=True,
-        collate_fn=filter_none_collate
+        collate_fn=my_collate
     )
     if not args.evaluate:
         train_loader = torch.utils.data.DataLoader(
             train_dataset,batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True,
-                                                   collate_fn=filter_none_collate
+                                                   collate_fn=my_collate
         )
     print("=> data loaders created.")
 
