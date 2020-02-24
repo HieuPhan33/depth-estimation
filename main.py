@@ -51,7 +51,7 @@ def main():
     valdir = os.path.join(data_dir, 'data', args.data, 'val')
     traindir = os.path.join(data_dir, 'data', args.data, 'train')
 
-    if args.data == 'nyudepthv2' or args.data == 'uow_dataset':
+    if args.data == 'nyu' or args.data == 'uow_dataset':
         from dataloaders.nyu import NYUDataset
         val_dataset = NYUDataset(valdir, split='val', modality=args.modality)
         #val_dataset = nc.SafeDataset(val_dataset)

@@ -10,7 +10,7 @@ cmap = plt.cm.viridis
 
 
 def parse_command():
-    data_names = ['nyudepthv2','uow_dataset']
+    data_names = ['nyu','uow_dataset']
     loss_names = ['l1', 'l2']
     model_names = ['mobilenet-skipconcat','mobilenet-skipadd','resnet18-skipadd',
                    'resnet18-skipconcat','resnet50-skipadd','resnet50-skipconcat']
@@ -21,9 +21,9 @@ def parse_command():
 
     import argparse
     parser = argparse.ArgumentParser(description='FastDepth')
-    parser.add_argument('--data', metavar='DATA', default='nyudepthv2',
+    parser.add_argument('--data', metavar='DATA', default='nyu',
                         choices=data_names,
-                        help='dataset: ' + ' | '.join(data_names) + ' (default: nyudepthv2)')
+                        help='dataset: ' + ' | '.join(data_names) + ' (default: nyu)')
     parser.add_argument('--arch', default='mobilenet-nnconv5dw-skipconcat',choices=model_names,
                         help='model architecture: ' + ' | '.join(model_names) + ' (default: mobilenet-nnconv5dw-skipconcat)')
     parser.add_argument('--decoder', '-d', metavar='DECODER', default='deconv2', choices=decoder_names,

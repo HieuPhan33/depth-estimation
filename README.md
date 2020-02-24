@@ -26,8 +26,8 @@ This repo offers trained models and evaluation code for the [FastDepth](http://f
 - Download the preprocessed [NYU Depth V2](http://cs.nyu.edu/~silberman/datasets/nyu_depth_v2.html) dataset in HDF5 format and place it under a `data` folder outside the repo directory. The NYU dataset requires 32G of storage space.
 	```bash
 	mkdir data; cd data
-	wget http://datasets.lids.mit.edu/fastdepth/data/nyudepthv2.tar.gz
-	tar -xvf nyudepthv2.tar.gz && rm -f nyudepthv2.tar.gz
+	wget http://datasets.lids.mit.edu/fastdepth/data/nyu.tar.gz
+	tar -xvf nyu.tar.gz && rm -f nyu.tar.gz
 	cd ..
 	```
 

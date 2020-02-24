@@ -2,11 +2,11 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="a1643513-89fb-47b8-83a6-a1d36c31b565" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/fast-depth.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/fast-depth.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/dataloaders/dataloader.py" beforeDir="false" afterPath="$PROJECT_DIR$/dataloaders/dataloader.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -91,7 +91,7 @@
         <ENTRIES />
       </EXTENSION>
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/main.py" />
-      <option name="PARAMETERS" value="--decoder upproj --arch resnet18-skipconcat --workers 10 --batch-size 1 --data uow_dataset --epochs 1 --lr 0.01" />
+      <option name="PARAMETERS" value="--decoder upproj --arch resnet18-skipconcat --workers 10 --batch-size 8 --data nyu --epochs 1 --lr 0.01" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
@@ -121,42 +121,66 @@
       <workItem from="1578051808100" duration="2301000" />
       <workItem from="1578109756838" duration="28284000" />
       <workItem from="1578466224182" duration="7407000" />
-      <workItem from="1582529047211" duration="1642000" />
+      <workItem from="1582529047211" duration="3253000" />
     </task>
+    <task id="LOCAL-00001" summary="Small fix">
+      <created>1582535744767</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1582535744767</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="1" />
   </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Small fix" />
+    <option name="LAST_COMMIT_MESSAGE" value="Small fix" />
+  </component>
   <component name="WindowStateProjectService">
-    <state x="457" y="197" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1582535658494">
+    <state x="457" y="197" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1582541057577">
       <screen x="65" y="24" width="1855" height="1056" />
     </state>
-    <state x="457" y="197" key="#com.intellij.execution.impl.EditConfigurationsDialog/65.24.1855.1056@65.24.1855.1056" timestamp="1582535658494" />
+    <state x="457" y="197" key="#com.intellij.execution.impl.EditConfigurationsDialog/65.24.1855.1056@65.24.1855.1056" timestamp="1582541057577" />
+    <state x="562" y="135" key="CommitChangelistDialog2" timestamp="1582535744722">
+      <screen x="65" y="24" width="1855" height="1056" />
+    </state>
+    <state x="562" y="135" key="CommitChangelistDialog2/65.24.1855.1056@65.24.1855.1056" timestamp="1582535744722" />
     <state x="349" y="214" key="FileChooserDialogImpl" timestamp="1582529233622">
       <screen x="65" y="24" width="1855" height="1056" />
     </state>
     <state x="349" y="214" key="FileChooserDialogImpl/65.24.1855.1056@65.24.1855.1056" timestamp="1582529233622" />
-    <state width="1809" height="319" key="GridCell.Tab.0.bottom" timestamp="1582535724206">
+    <state width="1809" height="319" key="GridCell.Tab.0.bottom" timestamp="1582541058987">
       <screen x="65" y="24" width="1855" height="1056" />
     </state>
-    <state width="1809" height="319" key="GridCell.Tab.0.bottom/65.24.1855.1056@65.24.1855.1056" timestamp="1582535724206" />
-    <state width="1809" height="319" key="GridCell.Tab.0.center" timestamp="1582535724206">
+    <state width="1809" height="319" key="GridCell.Tab.0.bottom/65.24.1855.1056@65.24.1855.1056" timestamp="1582541058987" />
+    <state width="1809" height="319" key="GridCell.Tab.0.center" timestamp="1582541058987">
       <screen x="65" y="24" width="1855" height="1056" />
     </state>
-    <state width="1809" height="319" key="GridCell.Tab.0.center/65.24.1855.1056@65.24.1855.1056" timestamp="1582535724206" />
-    <state width="1809" height="319" key="GridCell.Tab.0.left" timestamp="1582535724205">
+    <state width="1809" height="319" key="GridCell.Tab.0.center/65.24.1855.1056@65.24.1855.1056" timestamp="1582541058987" />
+    <state width="1809" height="319" key="GridCell.Tab.0.left" timestamp="1582541058987">
       <screen x="65" y="24" width="1855" height="1056" />
     </state>
-    <state width="1809" height="319" key="GridCell.Tab.0.left/65.24.1855.1056@65.24.1855.1056" timestamp="1582535724205" />
-    <state width="1809" height="319" key="GridCell.Tab.0.right" timestamp="1582535724206">
+    <state width="1809" height="319" key="GridCell.Tab.0.left/65.24.1855.1056@65.24.1855.1056" timestamp="1582541058987" />
+    <state width="1809" height="319" key="GridCell.Tab.0.right" timestamp="1582541058987">
       <screen x="65" y="24" width="1855" height="1056" />
     </state>
-    <state width="1809" height="319" key="GridCell.Tab.0.right/65.24.1855.1056@65.24.1855.1056" timestamp="1582535724206" />
+    <state width="1809" height="319" key="GridCell.Tab.0.right/65.24.1855.1056@65.24.1855.1056" timestamp="1582541058987" />
     <state x="486" y="174" key="SettingsEditor" timestamp="1582529149240">
       <screen x="65" y="24" width="1855" height="1056" />
     </state>
     <state x="486" y="174" key="SettingsEditor/65.24.1855.1056@65.24.1855.1056" timestamp="1582529149240" />
+    <state x="592" y="275" key="Vcs.Push.Dialog.v2" timestamp="1582535761131">
+      <screen x="65" y="24" width="1855" height="1056" />
+    </state>
+    <state x="592" y="275" key="Vcs.Push.Dialog.v2/65.24.1855.1056@65.24.1855.1056" timestamp="1582535761131" />
+    <state x="561" y="237" width="863" height="602" key="find.popup" timestamp="1582541036061">
+      <screen x="65" y="24" width="1855" height="1056" />
+    </state>
+    <state x="561" y="237" width="863" height="602" key="find.popup/65.24.1855.1056@65.24.1855.1056" timestamp="1582541036061" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -191,6 +215,6 @@
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/fast_depth$main.coverage" NAME="main Coverage Results" MODIFIED="1578470176476" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/depth_estimation$main.coverage" NAME="main Coverage Results" MODIFIED="1582530069871" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/depth_estimation$main.coverage" NAME="main Coverage Results" MODIFIED="1582541058981" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>
