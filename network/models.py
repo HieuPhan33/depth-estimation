@@ -554,6 +554,12 @@ class ResNetSkipConcat(nn.Module):
             self.decode_conv5 = nn.Sequential(
                 depthwise(128, kernel_size),
                 pointwise(128, 32))
+        elif decoder == 'aspd':
+            self.decode_conv1 = upsample(1024, 512,pooling_output_size=(3,3))
+            self.decode_conv2 = upsample(768, 256,pooling_output_size=(6,6))
+            self.decode_conv3 = upsample(384, 128,pooling_output_size=(12,12))
+            self.decode_conv4 = upsample(192, 64,pooling_output_size=(24,24))
+            self.decode_conv5 = upsample(128, 32,pooling_output_size=(48,48))
         else:
             self.decode_conv1 = upsample(1024, 512)
             self.decode_conv2 = upsample(768, 256)

@@ -273,7 +273,7 @@ class GlobalAvgPool(nn.Module):
 
 
 class ASPD(nn.Module):
-    def __init__(self, in_channels, out_channels, spatial_resolution=None, output_size=None):
+    def __init__(self, in_channels, out_channels, pooling_output_size=(4,4), output_size=None):
         super(ASPD, self).__init__()
         dilation_rates = [1, 3, 5, 7]
         modules = [0] * len(dilation_rates)
@@ -296,7 +296,7 @@ class ASPD(nn.Module):
         self.aspd4 = nn.Sequential(*modules[3])
         self.concat_process = nn.Sequential(
             # Seq_Ex_Block(out_channels * len(dilation_rates), len(dilation_rates)),
-            ChannelwiseLocalAttention(),
+            ChannelwiseLocalAttention(pooling_output_size=pooling_output_size),
             nn.Dropout2d(p=0.5),
             nn.Conv2d(out_channels * len(dilation_rates), out_channels, 1),
             nn.ReLU(inplace=True),
@@ -322,12 +322,14 @@ class ASPD(nn.Module):
 
 
 class ChannelwiseLocalAttention(nn.Module):
-    def __init__(self, pooling_size=(4, 4), r=2):
+    def __init__(self, pooling_output_size=(4, 4), r=0):
+        if r == 0:
+            r = pooling_output_size[0]
         super(ChannelwiseLocalAttention, self).__init__()
-        self.pooling_size = pooling_size
+        self.pooling_output_size = pooling_output_size
         # self.pool = nn.AvgPool2d(kernel_size=kernel_size, stride=kernel_size)
-        self.pool = nn.AdaptiveAvgPool2d(output_size=pooling_size)
-        in_channels = pooling_size[0] * pooling_size[1]
+        self.pool = nn.AdaptiveAvgPool2d(output_size=pooling_output_size)
+        in_channels = pooling_output_size[0] * pooling_output_size[1]
         out_channels = in_channels // r
         # Each conv_matrix having shape of 1 x 1 x (H*W) x (H*W/r)
         # They will be convolved on channel-wise matrix of shape (H*W) * C
@@ -347,7 +349,7 @@ class ChannelwiseLocalAttention(nn.Module):
 
         # Repeat the attention weights by the stride of pooling layer
         # to transform weight_mask matching the shape of original input
-        h_scale, w_scale = x.size(2) // self.pooling_size[0], x.size(3) // self.pooling_size[1]
+        h_scale, w_scale = x.size(2) // self.pooling_output_size[0], x.size(3) // self.pooling_output_size[1]
         att_weights = att_weights.view(N, C, H * W, 1)
         att_weights = att_weights.repeat(1, 1, 1, w_scale)
         att_weights = att_weights.view(N, C, H, W * w_scale)
