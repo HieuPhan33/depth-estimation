@@ -794,6 +794,12 @@ class MobileNetSkipConcat(nn.Module):
             self.decode_conv5 = nn.Sequential( # Reduce channels
                 depthwise(128, kernel_size),
                 pointwise(128, 32))
+        # elif decoder == 'aspd':
+        #     self.decode_conv1 = ASPD(1024, 512)
+        #     self.decode_conv2 = ASPD(512, 256)
+        #     self.decode_conv3 = ASPD(512, 128)  # Concat => inp = 256*2
+        #     self.decode_conv4 = ASPD(256, 64)  # inp = 128*2
+        #     self.decode_conv5 = ASPD(128, 32)  # inp = 64*2
         else:
             self.decode_conv1 = upsample(1024,512)
             self.decode_conv2 = upsample(512,256)
