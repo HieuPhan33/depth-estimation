@@ -144,7 +144,6 @@ def depthwise(in_channels, kernel_size):
         nn.ReLU(inplace=True),
     )
 
-
 def pointwise(in_channels, out_channels):
     return nn.Sequential(
         nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=False),
@@ -274,9 +273,9 @@ class GlobalAvgPool(nn.Module):
 
 
 class ASPD(nn.Module):
-    def __init__(self, in_channels, out_channels, spatial_resolution=None,output_size=None):
+    def __init__(self, in_channels, out_channels, spatial_resolution=None, output_size=None):
         super(ASPD, self).__init__()
-        dilation_rates = [1, 3, 5,7]
+        dilation_rates = [1, 3, 5, 7]
         modules = [0] * len(dilation_rates)
         for i, dilation in enumerate(dilation_rates):
             kernel_size = 4
@@ -295,13 +294,13 @@ class ASPD(nn.Module):
         self.aspd2 = nn.Sequential(*modules[1])
         self.aspd3 = nn.Sequential(*modules[2])
         self.aspd4 = nn.Sequential(*modules[3])
-        in_channels = out_channels * len(dilation_rates)
         self.concat_process = nn.Sequential(
-            #Seq_Ex_Block(out_channels * len(dilation_rates), len(dilation_rates)),
+            # Seq_Ex_Block(out_channels * len(dilation_rates), len(dilation_rates)),
             ChannelwiseLocalAttention(),
-            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.5),
             nn.Conv2d(out_channels * len(dilation_rates), out_channels, 1),
             nn.ReLU(inplace=True),
+            nn.BatchNorm2d(out_channels),
             nn.Dropout2d(p=0.5)
         )
         weights_init(self.aspd1)
@@ -323,13 +322,13 @@ class ASPD(nn.Module):
 
 
 class ChannelwiseLocalAttention(nn.Module):
-    def __init__(self, pooling_size=(4,4), r=2):
+    def __init__(self, pooling_size=(4, 4), r=2):
         super(ChannelwiseLocalAttention, self).__init__()
         self.pooling_size = pooling_size
-        #self.pool = nn.AvgPool2d(kernel_size=kernel_size, stride=kernel_size)
+        # self.pool = nn.AvgPool2d(kernel_size=kernel_size, stride=kernel_size)
         self.pool = nn.AdaptiveAvgPool2d(output_size=pooling_size)
         in_channels = pooling_size[0] * pooling_size[1]
-        out_channels = in_channels//r
+        out_channels = in_channels // r
         # Each conv_matrix having shape of 1 x 1 x (H*W) x (H*W/r)
         # They will be convolved on channel-wise matrix of shape (H*W) * C
         self.conv_Q = nn.Conv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=1)
@@ -338,25 +337,25 @@ class ChannelwiseLocalAttention(nn.Module):
     def forward(self, x):
         x_avg = self.pool(x)
         N, C, H, W = x_avg.size()
-        x_avg = x_avg.view(N,C,H*W)
-        x_avg = x_avg.transpose(1,2) # Reshape to channel-wise vector at each x_avg[0,0,:]
-        Q = self.conv_Q(x_avg) # N x (H/r*W/r) x c
-        K = self.conv_K(x_avg) # N x (H/r*W/r) x c
-        score = torch.matmul(Q.transpose(1,2),K)
-        score = F.softmax(score,dim=-1)
-        att_weights = torch.matmul(score,x_avg.transpose(1,2)) # att_weights = (C x C) x (C x (H*W)) = C x (H*W)
+        x_avg = x_avg.view(N, C, H * W)
+        x_avg = x_avg.transpose(1, 2)  # Reshape to channel-wise vector at each x_avg[0,0,:]
+        Q = self.conv_Q(x_avg)  # N x (H/r*W/r) x c
+        K = self.conv_K(x_avg)  # N x (H/r*W/r) x c
+        score = torch.matmul(Q.transpose(1, 2), K)
+        score = F.softmax(score, dim=-1)
+        att_weights = torch.matmul(score, x_avg.transpose(1, 2))  # att_weights = (C x C) x (C x (H*W)) = C x (H*W)
 
         # Repeat the attention weights by the stride of pooling layer
         # to transform weight_mask matching the shape of original input
         h_scale, w_scale = x.size(2) // self.pooling_size[0], x.size(3) // self.pooling_size[1]
-        att_weights = att_weights.view(N,C,H*W,1)
-        att_weights = att_weights.repeat(1,1,1,w_scale)
-        att_weights = att_weights.view(N,C,H,W*w_scale)
-        att_weights = att_weights.repeat(1,1,1,h_scale)
-        att_weights = att_weights.view(N,C,H*h_scale,W*w_scale)
+        att_weights = att_weights.view(N, C, H * W, 1)
+        att_weights = att_weights.repeat(1, 1, 1, w_scale)
+        att_weights = att_weights.view(N, C, H, W * w_scale)
+        att_weights = att_weights.repeat(1, 1, 1, h_scale)
+        att_weights = att_weights.view(N, C, H * h_scale, W * w_scale)
 
         if att_weights.size() != x.size():
-            att_weights = F.interpolate(att_weights,size=list(x.shape[2:]),mode='nearest')
+            att_weights = F.interpolate(att_weights, size=list(x.shape[2:]), mode='nearest')
         assert att_weights.size() == x.size()
 
         # Re-weight original input by weight mask
