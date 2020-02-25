@@ -244,35 +244,57 @@ class shuffle_conv(nn.Module):
         x = F.pixel_shuffle(x, upscale_factor=2)
         return self.conv(x)
 
+class Seq_Ex_Block(nn.Module):
+    def __init__(self, in_ch, r):
+        super(Seq_Ex_Block, self).__init__()
+        self.se = nn.Sequential(
+            GlobalAvgPool(),
+            nn.Linear(in_ch, in_ch // r),
+            nn.ReLU(inplace=True),
+            nn.Linear(in_ch // r, in_ch),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        se_weight = self.se(x).unsqueeze(-1).unsqueeze(-1)
+        # print(f'x:{x.sum()}, x_se:{x.mul(se_weight).sum()}')
+        return x.mul(se_weight)
+
+class GlobalAvgPool(nn.Module):
+    def __init__(self):
+        super(GlobalAvgPool, self).__init__()
+
+    def forward(self, x):
+        return x.view(*(x.shape[:-2]), -1).mean(-1)
 
 class ASPD(nn.Module):
     def __init__(self, in_channels, out_channels, output_size=None):
         super(ASPD, self).__init__()
-        self.aspd = [0] * 3
+        modules = [0]*3
         for i, dilation in enumerate([1, 5, 9]):
             kernel_size = 4
             padding = ((kernel_size - 1) * dilation - 1) // 2
-            modules = [nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels,
+            modules[i] = [nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels,
                                           kernel_size=kernel_size, padding=padding, dilation=dilation, stride=2),
                        nn.ReLU(inplace=True)
                        ]
 
             if output_size:
                 modules.append(nn.UpsamplingNearest2d(size=output_size))
-            self.aspd[i] = nn.Sequential(*modules)
-
-            # self.aspd[i].apply(weights_init)
+        self.aspd1 = nn.Sequential(*modules[0])
+        self.aspd2 = nn.Sequential(*modules[1])
+        self.aspd3 = nn.Sequential(*modules[2])
         self.concat_process = nn.Sequential(
             nn.Dropout2d(p=0.5),
             nn.Conv2d(out_channels * 3, out_channels, 1),
             nn.ReLU(inplace=True)
         )
-        # self.concat_process.apply(weights_init)
+        self.concat_process.apply(weights_init)
         weights_init(self.modules(), type='xavier')
 
     def forward(self, x):
-        outputs = []
-        for i, layer in enumerate(self.aspd):
-            outputs[i] = layer(x)
-        output = torch.cat(outputs, dim=1)
+        x1 = self.aspd1(x)
+        x2 = self.aspd2(x)
+        x3 = self.aspd3(x)
+        output = torch.cat([x1,x2,x3], dim=1)
         return self.concat_process(output)
