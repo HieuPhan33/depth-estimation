@@ -554,18 +554,18 @@ class ResNetSkipConcat(nn.Module):
             self.decode_conv5 = nn.Sequential(
                 depthwise(128, kernel_size),
                 pointwise(128, 32))
-        elif decoder == 'aspd':
-            self.decode_conv1 = upsample(1024, 512,pooling_output_size=(3,3))
-            self.decode_conv2 = upsample(768, 256,pooling_output_size=(6,6))
-            self.decode_conv3 = upsample(384, 128,pooling_output_size=(12,12))
-            self.decode_conv4 = upsample(192, 64,pooling_output_size=(24,24))
-            self.decode_conv5 = upsample(128, 32,pooling_output_size=(48,48))
+        # elif decoder == 'aspd':
+        #     self.decode_conv1 = upsample(1024, 512,pooling_output_size=(3,3))
+        #     self.decode_conv2 = upsample(768, 256,pooling_output_size=(6,6))
+        #     self.decode_conv3 = upsample(384, 128,pooling_output_size=(12,12))
+        #     self.decode_conv4 = upsample(192, 64,pooling_output_size=(24,24))
+        #     self.decode_conv5 = upsample(128, 32,pooling_output_size=(48,48))
         else:
-            self.decode_conv1 = upsample(1024, 512)
-            self.decode_conv2 = upsample(768, 256)
-            self.decode_conv3 = upsample(384, 128)
-            self.decode_conv4 = upsample(192, 64)
-            self.decode_conv5 = upsample(128, 32)
+            self.decode_conv1 = nn.Sequential(ChannelwiseLocalAttention(pooling_output_size=(4,4)),upsample(1024, 512))
+            self.decode_conv2 = nn.Sequential(ChannelwiseLocalAttention(pooling_output_size=(8,8)),upsample(768, 256))
+            self.decode_conv3 = nn.Sequential(ChannelwiseLocalAttention(pooling_output_size=(16,16)),upsample(384, 128))
+            self.decode_conv4 = nn.Sequential(ChannelwiseLocalAttention(pooling_output_size=(32,32)),upsample(192, 64))
+            self.decode_conv5 = nn.Sequential(ChannelwiseLocalAttention(pooling_output_size=(64,64)),upsample(128, 32))
         # self.decode_conv1 = conv(1024, 512, kernel_size)
         # self.decode_conv2 = conv(768, 256, kernel_size)
         # self.decode_conv3 = conv(384, 128, kernel_size)

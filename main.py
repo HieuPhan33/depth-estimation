@@ -1,6 +1,7 @@
 import os
 import time
 import csv
+import numpy as np
 import criteria
 import matplotlib.pyplot as plt
 from torchvision import transforms
@@ -46,11 +47,11 @@ def main():
 
     # Data loading code
     print("=> creating data loaders...")
-    data_dir = r'D:/Users/vmhp806'
+    data_dir = '/media/vasp/Data2/Users/vmhp806/depth-estimation'
     valdir = os.path.join(data_dir, 'data', args.data, 'val')
     traindir = os.path.join(data_dir, 'data', args.data, 'train')
 
-    if args.data == 'nyudepthv2' or args.data == 'uow_dataset':
+    if args.data == 'nyu' or args.data == 'uow_dataset':
         from dataloaders.nyu import NYUDataset
         val_dataset = NYUDataset(valdir, split='val', modality=args.modality)
         #val_dataset = nc.SafeDataset(val_dataset)
@@ -113,13 +114,13 @@ def main():
         print("=> creating Model ({} - {}) ...".format(args.arch,args.decoder))
         #in_channels = len(args.modality)
         if args.arch == 'mobilenet-skipconcat':
-            model = models.MobileNetSkipConcat(decoder=args.decoder, output_size=train_loader.dataset.output_size)
+            model = models.MobileNetSkipConcat(decoder=args.decoder,output_size=train_loader.dataset.output_size)
         elif args.arch == 'mobilenet-skipadd':
-            model = models.MobileNetSkipAdd(decoder=args.decoder, output_size=train_loader.dataset.output_size)
+            model = models.MobileNetSkipAdd(decoder=args.decoder,output_size=train_loader.dataset.output_size)
         elif args.arch == 'resnet18-skipconcat':
-            model = models.ResNetSkipConcat(layers=18, decoder=args.decoder, output_size=train_loader.dataset.output_size)
+            model = models.ResNetSkipConcat(layers=18,decoder=args.decoder,output_size=train_loader.dataset.output_size)
         elif args.arch == 'resnet18-skipadd':
-            model = models.ResNetSkipAdd(layers=18, output_size=train_loader.dataset.output_size)
+            model = models.ResNetSkipAdd(layers=18,output_size=train_loader.dataset.output_size)
         else:
             raise Exception('Invalid architecture')
         print("=> model created.")
