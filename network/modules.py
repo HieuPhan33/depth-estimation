@@ -322,39 +322,73 @@ class ASPD(nn.Module):
 
 
 class ChannelwiseLocalAttention(nn.Module):
-    def __init__(self, pooling_output_size=(4, 4), r=0):
-        if r == 0:
-            r = pooling_output_size[0]
+    def __init__(self, h_size = 0, pooling_output_size=(4, 4),n_heads=1):
         super(ChannelwiseLocalAttention, self).__init__()
         self.pooling_output_size = pooling_output_size
+        self.n_heads = n_heads
         # self.pool = nn.AvgPool2d(kernel_size=kernel_size, stride=kernel_size)
-        self.pool = nn.AdaptiveAvgPool2d(output_size=pooling_output_size)
+        #self.pool = nn.AdaptiveAvgPool2d(output_size=pooling_output_size)
         in_channels = pooling_output_size[0] * pooling_output_size[1]
-        out_channels = in_channels // r
+        if h_size == 0:
+            h_size = in_channels
+        if h_size == 0:
+            self.h_size = in_channels
+        self.h_size = h_size
+        assert(in_channels % n_heads == 0, "n_heads must be divisible by in_channels")
+        out_channels = self.h_size * self.n_heads
         # Each conv_matrix having shape of 1 x 1 x (H*W) x (H*W/r)
         # They will be convolved on channel-wise matrix of shape (H*W) * C
-        self.conv_Q = nn.Conv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=1)
-        self.conv_K = nn.Conv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=1)
+        self.conv_Q = nn.Conv1d(in_channels=in_channels, out_channels=out_channels, groups=n_heads, kernel_size=1)
+        self.conv_K = nn.Conv1d(in_channels=in_channels, out_channels=out_channels, groups=n_heads, kernel_size=1)
+        self.conv_V = nn.Conv1d(in_channels=in_channels, out_channels=in_channels*n_heads, groups=n_heads, kernel_size=1)
+        self.conv_combine = nn.Conv1d(in_channels=in_channels*n_heads,out_channels=in_channels,kernel_size=1)
+        # self.dropout1 = torch.nn.Dropout(p=0.5)
+        # self.dropout2 = torch.nn.Dropout(p=0.5)
+        # self.dropout3 = torch.nn.Dropout(p=0.5)
+        self.dropout = torch.nn.Dropout(p=0.5)
 
     def forward(self, x):
-        x_avg = self.pool(x)
+        # Derive parameters for pooling
+        N, C, H_in, W_in = x.size()
+        H_out, W_out = self.pooling_output_size
+        kernel = s = H_in // H_out
+        padding = (H_out*s - H_in) // 2
+        x_avg = F.avg_pool2d(x,kernel_size=kernel, stride=s, padding=padding)
+
+        #x_avg = self.pool(x)
         N, C, H, W = x_avg.size()
         x_avg = x_avg.view(N, C, H * W)
         x_avg = x_avg.transpose(1, 2)  # Reshape to channel-wise vector at each x_avg[0,0,:]
-        Q = self.conv_Q(x_avg)  # N x (H/r*W/r) x c
+        Q = self.conv_Q(x_avg)  # N x (H/r*W/r) x c*n_heads
+        Q = Q.transpose(1,2).view(-1,C,self.n_heads,self.h_size) # Shape: N x C x n_head x h_size
+        #Q = self.dropout1(Q)
         K = self.conv_K(x_avg)  # N x (H/r*W/r) x c
-        score = torch.matmul(Q.transpose(1, 2), K)
+        K = K.transpose(1,2).view(-1, C, self.n_heads, self.h_size)
+        #K = self.dropout2(K)
+        # V = x_avg
+        V = self.conv_V(x_avg) # The estimated scale that we should apply to each local neighborhood
+        V = V.transpose(1,2).view(-1, C, self.n_heads, H * W)
+
+        #score = torch.matmul(Q.transpose(1, 2), K)
+        score = torch.einsum('...xhd,...yhd->...hxy',Q,K)
         score = F.softmax(score, dim=-1)
-        att_weights = torch.matmul(score, x_avg.transpose(1, 2))  # att_weights = (C x C) x (C x (H*W)) = C x (H*W)
+        #att_weights = torch.matmul(score, V.transpose(1, 2))  # att_weights = (C x C) x (C x (H*W)) = C x (H*W)
+        weights = torch.einsum('...hcc,...chd->...hcd',score,V) # Shape: n_heads x C x (H*W)
+        weights = weights.transpose(1,2).view(-1,C,self.n_heads*H*W)
+        att_weights = self.conv_combine(weights.transpose(1,2))
+        att_weights = self.dropout(att_weights)
+        # => Re-balance the scale for each channel based on their importance relative to other channels
 
         # Repeat the attention weights by the stride of pooling layer
         # to transform weight_mask matching the shape of original input
         h_scale, w_scale = x.size(2) // self.pooling_output_size[0], x.size(3) // self.pooling_output_size[1]
-        att_weights = att_weights.view(N, C, H * W, 1)
-        att_weights = att_weights.repeat(1, 1, 1, w_scale)
-        att_weights = att_weights.view(N, C, H, W * w_scale)
-        att_weights = att_weights.repeat(1, 1, 1, h_scale)
-        att_weights = att_weights.view(N, C, H * h_scale, W * w_scale)
+        att_weights = att_weights.view(N,C,H,W)
+        att_weights = F.interpolate(att_weights,scale_factor=(h_scale,w_scale),mode='nearest')
+        # att_weights = att_weights.view(N, C, H * W, 1)
+        # att_weights = att_weights.repeat(1, 1, 1, w_scale)
+        # att_weights = att_weights.view(N, C, H, W * w_scale)
+        # att_weights = att_weights.repeat(1, 1, 1, h_scale)
+        # att_weights = att_weights.view(N, C, H * h_scale, W * w_scale)
 
         if att_weights.size() != x.size():
             att_weights = F.interpolate(att_weights, size=list(x.shape[2:]), mode='nearest')

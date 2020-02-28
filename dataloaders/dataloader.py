@@ -50,7 +50,7 @@ class MyDataloader(data.Dataset):
         classes, class_to_idx = self.find_classes(root)
         imgs = self.make_dataset(root, class_to_idx)
         assert len(imgs)>0, "Found 0 images in subfolders of: " + root + "\n"
-        # print("Found {} images in {} folder.".format(len(imgs), split))
+        print("Found {} images in {} folder.".format(len(imgs), split))
         self.root = root
         self.imgs = imgs
         self.classes = classes
