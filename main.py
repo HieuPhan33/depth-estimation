@@ -47,7 +47,7 @@ def main():
 
     # Data loading code
     print("=> creating data loaders...")
-    data_dir = '/media/vasp/Data2/Users/vmhp806/depth-estimation'
+    data_dir = '/media/vasp/Data1/Users/vmhp806'
     valdir = os.path.join(data_dir, 'data', args.data, 'val')
     traindir = os.path.join(data_dir, 'data', args.data, 'train')
 
