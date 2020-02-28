@@ -1,5 +1,6 @@
-FastDepth
+Local attention mechanism
 ============================
+In progress ...
 
 This repo offers trained models and evaluation code for the [FastDepth](http://fastdepth.mit.edu/) project at MIT.
 
